@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Duel — Rock Paper Scissors</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg: #14141c;
+    --panel: #1c1c27;
+    --panel-2: #22222f;
+    --rock: #8b8680;
+    --paper: #f2ede4;
+    --scissors: #a8b4bd;
+    --gold: #d4a73c;
+    --gold-bright: #e8c25f;
+    --text: #f5f3ef;
+    --muted: #8a8794;
+    --line: #33333f;
+    --win: #7fae7a;
+    --lose: #c96b5c;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #1c1c2a 0%, var(--bg) 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    overflow-x:hidden;
+  }
+  .display{ font-family:'Anton', sans-serif; letter-spacing:0.02em; text-transform:uppercase; }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  .screen{
+    width:100%;
+    max-width:460px;
+    animation: rise 0.5s cubic-bezier(.2,.8,.2,1);
+  }
+  @keyframes rise{
+    from{ opacity:0; transform:translateY(14px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .hidden{ display:none !important; }
+
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--gold);
+    margin-bottom:10px;
+  }
+  h1.title{
+    font-size:44px;
+    line-height:0.95;
+    margin-bottom:8px;
+  }
+  p.subtitle{
+    color:var(--muted);
+    font-size:15px;
+    margin-bottom:28px;
+    line-height:1.5;
+  }
+
+  /* --- Card / ticket base --- */
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:28px;
+  }
+
+  input[type=text]{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px;
+    color:var(--text);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:18px;
+    letter-spacing:0.05em;
+    outline:none;
+    transition: border-color 0.15s ease;
+  }
+  input[type=text]:focus{ border-color:var(--gold); }
+  input[type=text]::placeholder{ color:#565463; }
+
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    border:none;
+    border-radius:10px;
+    padding:16px 20px;
+    font-family:'Inter', sans-serif;
+    font-weight:700;
+    font-size:15px;
+    letter-spacing:0.01em;
+    cursor:pointer;
+    transition: transform 0.12s ease, filter 0.12s ease;
+    width:100%;
+  }
+  .btn:active{ transform:scale(0.98); }
+  .btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  .btn-primary{
+    background:linear-gradient(180deg, var(--gold-bright), var(--gold));
+    color:#1a1508;
+  }
+  .btn-primary:hover:not(:disabled){ filter:brightness(1.06); }
+  .btn-ghost{
+    background:transparent;
+    color:var(--muted);
+    border:1px solid var(--line);
+  }
+  .btn-ghost:hover{ color:var(--text); border-color:#4a4858; }
+
+  .field-label{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:0.12em;
+    color:var(--muted);
+    margin-bottom:10px;
+    display:block;
+  }
+
+  /* --- Home tiles --- */
+  .tile-row{ display:flex; flex-direction:column; gap:14px; }
+  .tile{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:26px;
+    text-align:left;
+    cursor:pointer;
+    transition: border-color 0.15s ease, transform 0.12s ease, background 0.15s ease;
+  }
+  .tile:hover{ border-color:var(--gold); transform:translateY(-2px); background:var(--panel-2); }
+  .tile:active{ transform:translateY(0); }
+  .tile .tile-icon{ font-size:26px; margin-bottom:10px; display:block; }
+  .tile .tile-title{ font-family:'Anton', sans-serif; font-size:22px; text-transform:uppercase; letter-spacing:0.01em; margin-bottom:4px; }
+  .tile .tile-desc{ color:var(--muted); font-size:13px; }
+  .welcome-name{ color:var(--gold); }
+
+  /* --- Ticket stub for party code --- */
+  .ticket{
+    position:relative;
+    background:var(--panel);
+    border:1px dashed #4a4858;
+    border-radius:14px;
+    padding:30px 24px;
+    text-align:center;
+    margin-bottom:22px;
+  }
+  .ticket::before, .ticket::after{
+    content:"";
+    position:absolute;
+    width:22px; height:22px;
+    background:var(--bg);
+    border:1px solid #4a4858;
+    border-radius:50%;
+    top:50%;
+    transform:translateY(-50%);
+  }
+  .ticket::before{ left:-12px; }
+  .ticket::after{ right:-12px; }
+  .ticket-label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.2em;
+    color:var(--muted);
+    margin-bottom:12px;
+  }
+  .ticket-code{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:42px;
+    font-weight:600;
+    letter-spacing:0.12em;
+    color:var(--gold-bright);
+  }
+
+  .pulse-dot{
+    display:inline-block;
+    width:8px; height:8px;
+    border-radius:50%;
+    background:var(--gold);
+    margin-right:8px;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ opacity:1; transform:scale(1); }
+    50%{ opacity:0.35; transform:scale(0.7); }
+  }
+  .status-row{
+    display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:14px; margin-bottom:22px;
+  }
+
+  /* --- Game screen --- */
+  .vs-row{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:30px;
+  }
+  .player{ text-align:center; flex:1; }
+  .player-name{ font-family:'Anton', sans-serif; font-size:20px; text-transform:uppercase; }
+  .player-score{ font-family:'IBM Plex Mono', monospace; font-size:34px; color:var(--gold); margin-top:4px; }
+  .vs-mark{ font-family:'Anton', sans-serif; color:var(--muted); font-size:16px; padding:0 14px; }
+
+  .round-status{
+    text-align:center;
+    color:var(--muted);
+    font-size:14px;
+    margin-bottom:22px;
+    min-height:20px;
+  }
+
+  .choices{
+    display:flex;
+    gap:14px;
+    justify-content:center;
+    margin-bottom:8px;
+  }
+  .choice-btn{
+    width:84px; height:84px;
+    border-radius:50%;
+    border:2px solid var(--line);
+    background: var(--panel-2);
+    display:flex; align-items:center; justify-content:center;
+    font-size:34px;
+    cursor:pointer;
+    transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    position:relative;
+  }
+  .choice-btn[data-choice="rock"]{ box-shadow: inset 0 0 0 0 var(--rock); }
+  .choice-btn:hover{ transform:translateY(-4px); border-color:var(--gold); }
+  .choice-btn.selected{ border-color:var(--gold-bright); box-shadow:0 0 0 3px rgba(212,167,60,0.25); }
+  .choice-btn:disabled{ cursor:default; opacity:0.4; }
+  .choice-btn:disabled:hover{ transform:none; border-color:var(--line); }
+
+  .reveal-row{
+    display:flex; align-items:center; justify-content:center; gap:26px;
+    margin: 26px 0 18px;
+  }
+  .reveal-medal{
+    width:96px; height:96px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:42px;
+    background:var(--panel-2);
+    border:2px solid var(--line);
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+  .reveal-medal.win{ border-color:var(--win); box-shadow:0 0 0 4px rgba(127,174,122,0.18); }
+  .reveal-medal.lose{ border-color:var(--lose); opacity:0.7; }
+  .reveal-vs{ font-family:'Anton', sans-serif; color:var(--muted); font-size:18px; }
+
+  .result-banner{
+    text-align:center;
+    font-family:'Anton', sans-serif;
+    font-size:26px;
+    text-transform:uppercase;
+    margin-bottom:18px;
+    letter-spacing:0.02em;
+  }
+  .result-banner.win{ color:var(--win); }
+  .result-banner.lose{ color:var(--lose); }
+  .result-banner.draw{ color:var(--muted); }
+
+  @keyframes clash{
+    0%{ transform:scale(1); }
+    30%{ transform:scale(1.12); }
+    100%{ transform:scale(1); }
+  }
+  .clash{ animation: clash 0.35s ease; }
+
+  .footer-note{
+    text-align:center;
+    color:#524f5e;
+    font-size:12px;
+    margin-top:20px;
+  }
+  .link-back{
+    color:var(--muted);
+    font-size:13px;
+    text-decoration:none;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    margin-bottom:18px;
+    cursor:pointer;
+  }
+  .link-back:hover{ color:var(--text); }
+</style>
+</head>
+<body>
+
+<!-- SCREEN: Name entry -->
+<div id="screen-name" class="screen">
+  <div class="eyebrow">Sign in</div>
+  <h1 class="title display">Who's<br>Throwing?</h1>
+  <p class="subtitle">Enter a name — this is what your opponent sees on the ticket.</p>
+  <div class="card">
+    <label class="field-label" for="name-input">Your name</label>
+    <input type="text" id="name-input" placeholder="e.g. Salmen" maxlength="16" autocomplete="off">
+    <div style="height:16px;"></div>
+    <button class="btn btn-primary" id="btn-save-name">Save & Continue</button>
+  </div>
+</div>
+
+<!-- SCREEN: Home -->
+<div id="screen-home" class="screen hidden">
+  <div class="eyebrow">Ready</div>
+  <h1 class="title display">Welcome, <span class="welcome-name" id="home-name">—</span></h1>
+  <p class="subtitle">Start a new duel or jump into your brother's.</p>
+  <div class="tile-row">
+    <div class="tile" id="tile-create">
+      <span class="tile-icon">✊</span>
+      <div class="tile-title display">Create Party</div>
+      <div class="tile-desc">Get a code, send it over, wait for your opponent.</div>
+    </div>
+    <div class="tile" id="tile-join">
+      <span class="tile-icon">🎟️</span>
+      <div class="tile-title display">Find Party</div>
+      <div class="tile-desc">Got a code? Enter it and jump straight in.</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Create (waiting room) -->
+<div id="screen-create" class="screen hidden">
+  <span class="link-back" id="back-from-create">&larr; Back</span>
+  <div class="eyebrow">Party created</div>
+  <h1 class="title display">Send This<br>Code</h1>
+  <p class="subtitle">Your opponent enters this on their "Find Party" screen.</p>
+  <div class="ticket">
+    <div class="ticket-label">Duel Pass</div>
+    <div class="ticket-code mono" id="create-code">— — — —</div>
+  </div>
+  <div class="status-row" id="create-status"><span class="pulse-dot"></span> Waiting for opponent to join...</div>
+</div>
+
+<!-- SCREEN: Join -->
+<div id="screen-join" class="screen hidden">
+  <span class="link-back" id="back-from-join">&larr; Back</span>
+  <div class="eyebrow">Find party</div>
+  <h1 class="title display">Enter the<br>Code</h1>
+  <p class="subtitle">Ask your opponent for their 4-character duel pass code.</p>
+  <div class="card">
+    <label class="field-label" for="code-input">Party code</label>
+    <input type="text" id="code-input" placeholder="XXXX" maxlength="4" autocomplete="off" style="text-transform:uppercase; text-align:center;">
+    <div style="height:16px;"></div>
+    <button class="btn btn-primary" id="btn-join">Join Party</button>
+  </div>
+  <div class="status-row hidden" id="join-status"><span class="pulse-dot"></span> Connecting...</div>
+</div>
+
+<!-- SCREEN: Game -->
+<div id="screen-game" class="screen hidden">
+  <div class="vs-row">
+    <div class="player">
+      <div class="player-name" id="game-my-name">You</div>
+      <div class="player-score" id="game-my-score">0</div>
+    </div>
+    <div class="vs-mark display">VS</div>
+    <div class="player">
+      <div class="player-name" id="game-opp-name">Opponent</div>
+      <div class="player-score" id="game-opp-score">0</div>
+    </div>
+  </div>
+
+  <div class="round-status" id="round-status">Make your move.</div>
+
+  <div id="reveal-area" class="hidden">
+    <div class="result-banner" id="result-banner"></div>
+    <div class="reveal-row">
+      <div class="reveal-medal" id="reveal-mine">✊</div>
+      <div class="reveal-vs display">VS</div>
+      <div class="reveal-medal" id="reveal-theirs">✊</div>
+    </div>
+    <button class="btn btn-primary" id="btn-again">Play Again</button>
+  </div>
+
+  <div id="pick-area">
+    <div class="choices">
+      <button class="choice-btn" data-choice="rock" title="Rock">✊</button>
+      <button class="choice-btn" data-choice="paper" title="Paper">✋</button>
+      <button class="choice-btn" data-choice="scissors" title="Scissors">✌️</button>
+    </div>
+  </div>
+
+  <div class="footer-note" id="conn-note"></div>
+</div>
+
+<script>
+(function(){
+  // ---------- State ----------
+  var state = {
+    myName: '',
+    peer: null,
+    conn: null,
+    isHost: false,
+    code: '',
+    myChoice: null,
+    oppChoice: null,
+    oppName: 'Opponent',
+    myScore: 0,
+    oppScore: 0
+  };
+
+  var ICONS = { rock: '✊', paper: '✋', scissors: '✌️' };
+  var PREFIX = 'rpsduel-brothers-';
+
+  // ---------- Screen helpers ----------
+  function showScreen(id){
+    ['screen-name','screen-home','screen-create','screen-join','screen-game'].forEach(function(s){
+      document.getElementById(s).classList.toggle('hidden', s !== id);
+    });
+  }
+
+  // ---------- Storage (personal, saved name) ----------
+  async function loadSavedName(){
+    try{
+      var res = await window.storage.get('player-name', false);
+      return res ? res.value : null;
+    }catch(e){ return null; }
+  }
+  async function saveName(name){
+    try{ await window.storage.set('player-name', name, false); }catch(e){}
+  }
+
+  // ---------- Init ----------
+  (async function init(){
+    var saved = await loadSavedName();
+    if(saved){
+      state.myName = saved;
+      document.getElementById('home-name').textContent = saved;
+      showScreen('screen-home');
+    } else {
+      showScreen('screen-name');
+    }
+  })();
+
+  document.getElementById('name-input').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') document.getElementById('btn-save-name').click();
+  });
+
+  document.getElementById('btn-save-name').addEventListener('click', async function(){
+    var val = document.getElementById('name-input').value.trim();
+    if(!val) return;
+    state.myName = val;
+    await saveName(val);
+    document.getElementById('home-name').textContent = val;
+    showScreen('screen-home');
+  });
+
+  document.getElementById('tile-create').addEventListener('click', createParty);
+  document.getElementById('tile-join').addEventListener('click', function(){
+    showScreen('screen-join');
+  });
+  document.getElementById('back-from-create').addEventListener('click', function(){
+    teardownPeer();
+    showScreen('screen-home');
+  });
+  document.getElementById('back-from-join').addEventListener('click', function(){
+    teardownPeer();
+    showScreen('screen-home');
+  });
+
+  function teardownPeer(){
+    if(state.conn){ try{ state.conn.close(); }catch(e){} state.conn = null; }
+    if(state.peer){ try{ state.peer.destroy(); }catch(e){} state.peer = null; }
+    state.myChoice = null; state.oppChoice = null; state.myScore = 0; state.oppScore = 0;
+  }
+
+  function randomCode(){
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
+    var code = '';
+    for(var i=0;i<4;i++) code += chars[Math.floor(Math.random()*chars.length)];
+    return code;
+  }
+
+  // ---------- Create party (host) ----------
+  function createParty(){
+    state.isHost = true;
+    var code = randomCode();
+    state.code = code;
+    var peer = new Peer(PREFIX + code);
+    state.peer = peer;
+
+    document.getElementById('create-code').textContent = code.split('').join(' ');
+    document.getElementById('create-status').innerHTML = '<span class="pulse-dot"></span> Waiting for opponent to join...';
+    showScreen('screen-create');
+
+    peer.on('open', function(){});
+
+    peer.on('connection', function(conn){
+      state.conn = conn;
+      wireConnection(conn);
+    });
+
+    peer.on('error', function(err){
+      if(err.type === 'unavailable-id'){
+        // code collision, retry with a new one
+        createParty();
+      } else {
+        document.getElementById('create-status').textContent = 'Connection error — go back and try again.';
+      }
+    });
+  }
+
+  // ---------- Join party ----------
+  document.getElementById('code-input').addEventListener('input', function(e){
+    e.target.value = e.target.value.toUpperCase();
+  });
+  document.getElementById('code-input').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') document.getElementById('btn-join').click();
+  });
+
+  document.getElementById('btn-join').addEventListener('click', function(){
+    var code = document.getElementById('code-input').value.trim().toUpperCase();
+    if(code.length !== 4) return;
+    state.isHost = false;
+    state.code = code;
+
+    document.getElementById('join-status').classList.remove('hidden');
+    document.getElementById('btn-join').disabled = true;
+
+    var peer = new Peer();
+    state.peer = peer;
+
+    peer.on('open', function(){
+      var conn = peer.connect(PREFIX + code, { reliable: true });
+      state.conn = conn;
+      wireConnection(conn);
+
+      conn.on('error', function(){
+        document.getElementById('join-status').innerHTML = 'Couldn\'t find that party. Check the code and try again.';
+        document.getElementById('btn-join').disabled = false;
+      });
+    });
+
+    peer.on('error', function(err){
+      document.getElementById('join-status').innerHTML = 'Couldn\'t find that party. Check the code and try again.';
+      document.getElementById('btn-join').disabled = false;
+    });
+  });
+
+  // ---------- Shared connection wiring ----------
+  function wireConnection(conn){
+    conn.on('open', function(){
+      sendMsg({ type: 'name', name: state.myName });
+      enterGameScreen();
+    });
+    conn.on('data', handleData);
+    conn.on('close', function(){
+      document.getElementById('conn-note').textContent = 'Opponent disconnected.';
+    });
+  }
+
+  function sendMsg(msg){
+    if(state.conn && state.conn.open) state.conn.send(msg);
+  }
+
+  function handleData(msg){
+    if(msg.type === 'name'){
+      state.oppName = msg.name;
+      document.getElementById('game-opp-name').textContent = state.oppName;
+    } else if(msg.type === 'choice'){
+      state.oppChoice = msg.choice;
+      checkReveal();
+    } else if(msg.type === 'rematch'){
+      resetRound(false);
+    }
+  }
+
+  // ---------- Game screen ----------
+  function enterGameScreen(){
+    document.getElementById('game-my-name').textContent = state.myName;
+    document.getElementById('game-opp-name').textContent = state.oppName;
+    document.getElementById('game-my-score').textContent = state.myScore;
+    document.getElementById('game-opp-score').textContent = state.oppScore;
+    resetRound(true);
+    showScreen('screen-game');
+  }
+
+  document.querySelectorAll('.choice-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      if(state.myChoice) return; // already picked this round
+      var choice = btn.getAttribute('data-choice');
+      state.myChoice = choice;
+      document.querySelectorAll('.choice-btn').forEach(function(b){
+        b.disabled = true;
+        b.classList.toggle('selected', b === btn);
+      });
+      document.getElementById('round-status').textContent = 'Locked in ' + ICONS[choice] + ' — waiting on ' + state.oppName + '...';
+      sendMsg({ type: 'choice', choice: choice });
+      checkReveal();
+    });
+  });
+
+  function checkReveal(){
+    if(state.myChoice && state.oppChoice){
+      revealResult();
+    }
+  }
+
+  function beats(a, b){
+    return (a === 'rock' && b === 'scissors') ||
+           (a === 'paper' && b === 'rock') ||
+           (a === 'scissors' && b === 'paper');
+  }
+
+  function revealResult(){
+    document.getElementById('pick-area').classList.add('hidden');
+    var revealArea = document.getElementById('reveal-area');
+    revealArea.classList.remove('hidden');
+
+    var mine = document.getElementById('reveal-mine');
+    var theirs = document.getElementById('reveal-theirs');
+    mine.textContent = ICONS[state.myChoice];
+    theirs.textContent = ICONS[state.oppChoice];
+    mine.classList.add('clash');
+    theirs.classList.add('clash');
+
+    var banner = document.getElementById('result-banner');
+    mine.classList.remove('win','lose');
+    theirs.classList.remove('win','lose');
+
+    if(state.myChoice === state.oppChoice){
+      banner.textContent = "Draw — throw again";
+      banner.className = 'result-banner draw';
+    } else if(beats(state.myChoice, state.oppChoice)){
+      state.myScore++;
+      banner.textContent = 'You win this round';
+      banner.className = 'result-banner win';
+      mine.classList.add('win'); theirs.classList.add('lose');
+    } else {
+      state.oppScore++;
+      banner.textContent = state.oppName + ' wins this round';
+      banner.className = 'result-banner lose';
+      theirs.classList.add('win'); mine.classList.add('lose');
+    }
+    document.getElementById('game-my-score').textContent = state.myScore;
+    document.getElementById('game-opp-score').textContent = state.oppScore;
+    document.getElementById('round-status').textContent = '';
+  }
+
+  document.getElementById('btn-again').addEventListener('click', function(){
+    sendMsg({ type: 'rematch' });
+    resetRound(false);
+  });
+
+  function resetRound(isFirst){
+    state.myChoice = null;
+    state.oppChoice = null;
+    document.getElementById('reveal-area').classList.add('hidden');
+    document.getElementById('pick-area').classList.remove('hidden');
+    document.getElementById('round-status').textContent = isFirst ? 'Make your move.' : 'Next round — make your move.';
+    document.querySelectorAll('.choice-btn').forEach(function(b){
+      b.disabled = false;
+      b.classList.remove('selected');
+    });
+    document.getElementById('reveal-mine').classList.remove('clash','win','lose');
+    document.getElementById('reveal-theirs').classList.remove('clash','win','lose');
+  }
+})();
+</script>
+</body>
+</html>
